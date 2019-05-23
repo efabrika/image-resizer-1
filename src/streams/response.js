@@ -1,28 +1,28 @@
 'use strict';
 
-var fs     = require('fs');
+var fs = require('fs');
 var stream = require('stream');
-var env    = require('../config/environment_vars');
-var util   = require('util');
+var env = require('../config/environment_vars');
+var util = require('util');
+var path = require('path');
+var mkdirp = require('mkdirp');
 
-
-function ResponseWriter(request, response){
-  if (!(this instanceof ResponseWriter)){
+function ResponseWriter(request, response) {
+  if (!(this instanceof ResponseWriter)) {
     return new ResponseWriter(request, response);
   }
 
   this.request = request;
   this.response = response;
 
-  stream.Writable.call(this, { objectMode : true });
+  stream.Writable.call(this, { objectMode: true });
 }
 
 util.inherits(ResponseWriter, stream.Writable);
 
-
-ResponseWriter.prototype.shouldCacheResponse = function(){
-  if (env.development){
-    if (env.CACHE_DEV_REQUESTS){
+ResponseWriter.prototype.shouldCacheResponse = function() {
+  if (env.development) {
+    if (env.CACHE_DEV_REQUESTS) {
       return true;
     } else {
       return false;
@@ -32,9 +32,8 @@ ResponseWriter.prototype.shouldCacheResponse = function(){
   return true;
 };
 
-
-ResponseWriter.prototype._write = function(image){
-  if (image.isError()){
+ResponseWriter.prototype._write = function(image) {
+  if (image.isError()) {
     image.log.error(image.error.message);
     image.log.flush();
     var statusCode = image.error.statusCode || 500;
@@ -42,18 +41,28 @@ ResponseWriter.prototype._write = function(image){
     if (statusCode === 404 && env.IMAGE_404) {
       this.response.status(404);
       fs.createReadStream(env.IMAGE_404).pipe(this.response);
-    }
-    else {
+    } else {
       this.response.status(statusCode).end();
     }
 
     return;
   }
 
-  if (image.modifiers.action === 'json'){
-    if (this.shouldCacheResponse()){
+  var imgpath = '/tmp/optimized' + this.request.path;
+  var imgdir = path.dirname(imgpath);
+
+  mkdirp(imgdir, function(err) {
+    if (err) return console.error(err);
+
+    fs.writeFile(imgpath, new Buffer(image.contents), function(err) {
+      if (err) console.error(err);
+    });
+  });
+
+  if (image.modifiers.action === 'json') {
+    if (this.shouldCacheResponse()) {
       this.response.set({
-        'Cache-Control': 'max-age=' + String(image.expiry)
+        'Cache-Control': 'max-age=' + String(image.expiry),
       });
     }
 
@@ -63,23 +72,21 @@ ResponseWriter.prototype._write = function(image){
     return this.end();
   }
 
-  if (this.shouldCacheResponse()){
+  if (this.shouldCacheResponse()) {
     this.response.set({
-      'Cache-Control': 'max-age=' + String(image.expiry)
+      'Cache-Control': 'max-age=' + String(image.expiry),
     });
   }
 
   this.response.type(image.format);
 
-  if (image.isStream()){
+  if (image.isStream()) {
     image.contents.pipe(this.response);
-  }
-
-  else {
+  } else {
     image.log.log(
       'original image size:',
       image.log.colors.grey(
-        (image.originalContentLength/1000).toString() + 'kb'
+        (image.originalContentLength / 1000).toString() + 'kb'
       )
     );
     image.log.log(
@@ -89,9 +96,9 @@ ResponseWriter.prototype._write = function(image){
 
     // as a debugging step print a checksum for the modified image, so we can
     // track to see if the image is replicated effectively between requests
-    if (env.development){
+    if (env.development) {
       var crypto = require('crypto'),
-          shasum = crypto.createHash('sha1');
+        shasum = crypto.createHash('sha1');
       shasum.update(image.contents);
       image.log.log('checksum', shasum.digest('hex'));
     }
@@ -103,6 +110,5 @@ ResponseWriter.prototype._write = function(image){
   image.log.flush();
   this.end();
 };
-
 
 module.exports = ResponseWriter;
