@@ -7,6 +7,8 @@ var util = require('util');
 var path = require('path');
 var mkdirp = require('mkdirp');
 
+var cacheFileDir = env.CACHE_FILE_DIRECTORY;
+
 function ResponseWriter(request, response) {
   if (!(this instanceof ResponseWriter)) {
     return new ResponseWriter(request, response);
@@ -48,16 +50,18 @@ ResponseWriter.prototype._write = function(image) {
     return;
   }
 
-  var imgpath = '/tmp/optimized' + this.request.path;
-  var imgdir = path.dirname(imgpath);
+  if (cacheFileDir) {
+    var imgPath = '/tmp/' + cacheFileDir + this.request.path;
+    var imgDir = path.dirname(imgPath);
 
-  mkdirp(imgdir, function(err) {
-    if (err) return console.error(err);
+    mkdirp(imgDir, function(err) {
+      if (err) return console.error(err);
 
-    fs.writeFile(imgpath, new Buffer(image.contents), function(err) {
-      if (err) console.error(err);
+      fs.writeFile(imgPath, new Buffer(image.contents), function(err) {
+        if (err) console.error(err);
+      });
     });
-  });
+  }
 
   if (image.modifiers.action === 'json') {
     if (this.shouldCacheResponse()) {

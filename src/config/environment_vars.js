@@ -5,7 +5,6 @@ var _, vars;
 _ = require('lodash');
 
 vars = {
-
   NODE_ENV: 'development',
   PORT: 3001,
   DEFAULT_SOURCE: 's3',
@@ -63,43 +62,46 @@ vars = {
   // Whitelist arbitrary HTTP source prefixes using EXTERNAL_SOURCE_*
   EXTERNAL_SOURCE_WIKIPEDIA: 'https://upload.wikimedia.org/wikipedia/',
 
-  USER_AGENT: 'image-resizer'
+  USER_AGENT: 'image-resizer',
 
+  CACHE_FILE_DIRECTORY: null,
 };
 
-_.forEach(vars, function(value, key){
+_.forEach(vars, function(value, key) {
   var keyType = typeof vars[key];
 
-  if (_.has(process.env, key)){
+  if (_.has(process.env, key)) {
     vars[key] = process.env[key];
 
     if (keyType === 'number') {
-      vars[key] = +(vars[key]);
+      vars[key] = +vars[key];
     }
 
     // cast any boolean strings to proper boolean values
-    if (vars[key] === 'true'){
+    if (vars[key] === 'true') {
       vars[key] = true;
     }
-    if (vars[key] === 'false'){
+    if (vars[key] === 'false') {
       vars[key] = false;
     }
   }
-
 });
 
 // Add external sources from environment vars
 vars.externalSources = {};
-Object.keys(vars).concat(Object.keys(process.env)).filter(function(key) {
-  return (/^EXTERNAL_SOURCE_/).test(key);
-}).forEach(function(key) {
-  vars.externalSources[key.substr('EXTERNAL_SOURCE_'.length).toLowerCase()] = process.env[key] || vars[key];
-});
+Object.keys(vars)
+  .concat(Object.keys(process.env))
+  .filter(function(key) {
+    return /^EXTERNAL_SOURCE_/.test(key);
+  })
+  .forEach(function(key) {
+    vars.externalSources[key.substr('EXTERNAL_SOURCE_'.length).toLowerCase()] =
+      process.env[key] || vars[key];
+  });
 
 // A few helpers to quickly determine the environment
 vars.development = vars.NODE_ENV === 'development';
-vars.test        = vars.NODE_ENV === 'test';
-vars.production  = vars.NODE_ENV === 'production';
-
+vars.test = vars.NODE_ENV === 'test';
+vars.production = vars.NODE_ENV === 'production';
 
 module.exports = vars;
